@@ -5,10 +5,35 @@ no cloud in between — matches the protocol from the Android `SimHubAndroid` pr
 
 ## Why no .xcodeproj is included
 Xcode project files are a binary/plist format that's easy to corrupt by hand-editing
-outside Xcode. Rather than risk handing you a project that won't open, here are the
-5 source files plus exact steps to wire them into a fresh project — takes about 2 minutes.
+outside Xcode. Instead, this project includes `project.yml` — a spec for **XcodeGen**
+(a free, standard tool) that generates a correct `.xcodeproj` automatically, both
+locally and in Codemagic's cloud build below. That's what `codemagic.yaml` does
+in its "Generate Xcode project" step.
 
-## Setup steps
+## Build with Codemagic — no Mac needed
+1. Create a free account at **codemagic.io**, connect your GitHub account.
+2. Push/upload this entire `SimHubIOS` folder to a new GitHub repository
+   (`codemagic.yaml` and `project.yml` must sit at the repo root).
+3. In Codemagic, add the repo as a new app — it auto-detects `codemagic.yaml`.
+4. Under the app's **Team settings → Code signing identities**, connect your
+   **Apple ID** (free account is fine) so Codemagic can sign the build automatically.
+5. Register your iPhone: Codemagic will prompt for its device UDID the first time —
+   it gives you a link to open on the iPhone in Safari, which captures the UDID
+   automatically, no manual steps.
+6. Edit `codemagic.yaml`'s `recipients:` line to your real email, or skip publishing
+   and just download the `.ipa` artifact from the build results page instead.
+7. Click **Start new build**. When it finishes, download the `.ipa`.
+8. Get it onto the iPhone with either:
+   - **Sideloadly** (Windows/Mac app, drag in the `.ipa`, sign in with the same
+     Apple ID, install over USB), or
+   - Upload the `.ipa` to **diawi.com** (free), open the link it gives you in
+     **Safari on the iPhone**, tap Install directly — no laptop step at all.
+9. On the iPhone: **Settings → General → VPN & Device Management** → trust the profile.
+
+Reminder: a **free** Apple ID means the install expires after 7 days — repeat step 8
+to reinstall. A $99/year paid Apple Developer account removes that limit.
+
+## Setup steps (only needed if building locally on a Mac instead)
 1. Open Xcode → **File → New → Project → iOS → App**.
    - Interface: **SwiftUI**
    - Language: **Swift**
@@ -26,17 +51,32 @@ outside Xcode. Rather than risk handing you a project that won't open, here are 
 6. Build & run on a **real iPhone** (CallKit doesn't behave fully on the Simulator).
 
 ## What this build does
-- Connects to the Android hub over WebSocket and pairs with the 6-digit PIN
-- Live dashboard: SIM signal bars per slot, recent call log, SMS log
-- When Android reports a call `"ringing"`, this app shows a **real native CallKit
-  incoming-call screen** on the iPhone (lock screen style, with Answer/Decline)
+- Native iOS tab UI: **Keypad, Recents, Contacts, Messages, Signal**
+- Keypad places real calls through Android's SIM (`ACTION_CALL` on the Android side)
+- Contacts: merges the iPhone's own address book with contacts relayed from Android
+  (Gmail contacts are NOT included — see limitation below)
+- Messages: view incoming SMS and send new ones (relayed through Android's SmsManager)
+- Real native **CallKit** incoming-call screen when Android reports a ring
+- A real **live two-way audio call** (WebRTC) between the two apps — this is genuine
+  working VoIP audio, not a mock
 
-## What this build does NOT do yet
-- **No call audio.** Answering just fulfills the CallKit action right now — the hooks
-  (`CallKitManager.onAnswer` / `onEnd`, and `didActivate`/`didDeactivate audioSession`)
-  are already in place with comments showing exactly where to start/stop a WebRTC
-  audio session in Phase 2.
-- **Background/lock-screen alerting has a real limitation you should know about now:**
+## The one limitation that doesn't go away: real caller audio
+The WebRTC audio channel connects **the iPhone app's mic/speaker to the Android app's
+own mic/speaker** — a real call between the two devices. It cannot carry the voice of
+whoever actually called the SIM's real phone number, in either direction. Stock,
+non-rooted Android blocks third-party apps from capturing or injecting audio on a real
+cellular call — this is an OS-level restriction, not something fixable in this codebase.
+If you need genuinely hearing/talking to the real caller through the iPhone, that
+requires dedicated GSM-modem hardware instead of a stock Android phone (see the very
+first conversation about this constraint).
+
+## Gmail contacts — why they're not included
+Syncing an actual Google account's contacts requires Google Sign-In + the People API,
+which means talking to Google's servers — the one piece of this whole system that
+can't be fully local, similar to the PushKit caveat below. Can be added as a later
+step if you want it; flagged here rather than silently skipped.
+
+## Background/lock-screen alerting limitation (unchanged from before)
   Apple deprecated always-on background VoIP sockets years ago. Reliable "ring even
   if the app was killed" behavior requires **PushKit + a VoIP push certificate**,
   which means Apple's push servers have to be in the loop for that one specific

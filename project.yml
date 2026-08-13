@@ -4,12 +4,19 @@ options:
   deploymentTarget:
     iOS: "16.0"
 
+packages:
+  WebRTC:
+    url: https://github.com/stasel/WebRTC-SPM
+    from: 125.0.0
+
 targets:
   SimHub:
     type: application
     platform: iOS
     sources:
       - Sources
+    dependencies:
+      - package: WebRTC
     info:
       path: Generated/Info.plist
       properties:

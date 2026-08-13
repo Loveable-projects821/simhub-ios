@@ -39,6 +39,27 @@ struct CallEvent: Identifiable {
     }
 }
 
+struct HubContact: Identifiable, Hashable {
+    let id = UUID()
+    var name: String
+    var number: String
+    var source: String   // "iphone" | "android"
+
+    init?(json: [String: Any]) {
+        guard let name = json["name"] as? String,
+              let number = json["number"] as? String else { return nil }
+        self.name = name
+        self.number = number
+        self.source = "android"
+    }
+
+    init(name: String, number: String, source: String) {
+        self.name = name
+        self.number = number
+        self.source = source
+    }
+}
+
 struct SmsEvent: Identifiable {
     let id = UUID()
     let from: String
